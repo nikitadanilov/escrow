@@ -1,4 +1,6 @@
 /* -*- C -*- */
+/* Copyright 2024 Nikita Danilov <danilov@gmail.com> */
+/* See https://github.com/nikitadanilov/escrow/blob/master/LICENCE for the licencing information. */
 
 #ifndef __LIBESCROW_H__
 #define __LIBESCROW_H__

@@ -1,4 +1,6 @@
 /* -*- C -*- */
+/* Copyright 2024 Nikita Danilov <danilov@gmail.com> */
+/* See https://github.com/nikitadanilov/escrow/blob/master/LICENCE for the licencing information. */
 
 #include <stddef.h>
 #include <stdio.h>

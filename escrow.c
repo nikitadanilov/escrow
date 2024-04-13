@@ -1,6 +1,5 @@
 /* -*- C -*- */
 
-#include <asm-generic/errno.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +12,8 @@
 #include <stdint.h>
 #include <assert.h>
 #include <sys/prctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "escrow.h"
 
@@ -198,62 +199,7 @@ struct msg {
         };
 };
 
-int escrowd_init(struct escrowd **out, const char *path, uint32_t flags, int32_t nr_tags) {
-        struct sockaddr_un address;
-        struct escrowd *d    = mem_alloc(sizeof *d);
-        struct tag     *tags = mem_alloc(nr_tags * sizeof tags[0]);
-        if (d == NULL || tags == NULL) {
-                mem_free(d);
-                mem_free(tags);
-                warn("Cannot allocate escrowd.");
-                return ERROR(-ENOMEM);
-        }
-        if (flags & ESCROW_FORCE) {
-                unlink(path);
-        }
-        if (strlen(path) >= sizeof(address.sun_path) - 1) {
-                warn("path is too long: \"%s\"", path);
-                return ERROR(-EINVAL);
-        }
-        if ((d->fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-                warn("socket()");
-                return ERROR(-errno);
-        }
-        address.sun_family = AF_UNIX;
-        strncpy(address.sun_path, path, sizeof(address.sun_path) - 1);
-        if (bind(d->fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-                warn("bind()");
-                return ERROR(-errno);
-        }
-        if (listen(d->fd, QUEUE) < 0) {
-                warn("listen()");
-                return ERROR(-errno);
-        }
-        printf("Listening on \"%s\"\n", path);
-        d->tags = tags;
-        d->path = path;
-        d->nr_tags = nr_tags;
-        for (int32_t i = 0; i < nr_tags; ++i) {
-                seq_init(&d->tags[i].seq);
-        }
-        *out = d;
-        return 0;
-}
-
-void escrowd_fini(struct escrowd *d) {
-        for (int32_t i = 0; i < d->nr_tags; ++i) {
-                struct seq *s   = &d->tags[i].seq;
-                int32_t     max = seq_nr(s);
-                for (int32_t j = 0; j < max; ++j) {
-                        mem_free(seq_get(s, i));
-                }
-                seq_fini(&d->tags[i].seq);
-        }
-        mem_free(d->tags);
-        close(d->stream);
-        close(d->fd);
-        unlink(d->path);
-}
+/* @msg */
 
 static int32_t msize(const struct msg *m) {
         switch (m->opcode) {
@@ -428,6 +374,70 @@ static int get(struct escrowd *d, const struct mget *m, int fd) {
         add.nob    = s->nob;
         memcpy(add.data, s->data, s->nob);
         return msend(d->stream, (void *)&add, s->fd);
+}
+
+/* @daemon */
+
+int escrowd_init(struct escrowd **out, const char *path, uint32_t flags, int32_t nr_tags) {
+        struct sockaddr_un address;
+        int                result;
+        mode_t             mask;
+        struct tag        *tags = mem_alloc(nr_tags * sizeof tags[0]);
+        struct escrowd    *d    = mem_alloc(sizeof *d);
+        if (d == NULL || tags == NULL) {
+                mem_free(d);
+                mem_free(tags);
+                warn("Cannot allocate escrowd.");
+                return ERROR(-ENOMEM);
+        }
+        if (flags & ESCROW_FORCE) {
+                unlink(path);
+        }
+        if (strlen(path) >= sizeof(address.sun_path) - 1) {
+                warn("path is too long: \"%s\"", path);
+                return ERROR(-EINVAL);
+        }
+        if ((d->fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+                warn("socket()");
+                return ERROR(-errno);
+        }
+        address.sun_family = AF_UNIX;
+        strncpy(address.sun_path, path, sizeof(address.sun_path) - 1);
+        mask = umask(0777 & ~(S_IRUSR | S_IWUSR)); /* rw------- */
+        result = bind(d->fd, (struct sockaddr *)&address, sizeof(address));
+        umask(mask);
+        if (result < 0) {
+                warn("bind()");
+                return ERROR(-errno);
+        }
+        if (listen(d->fd, QUEUE) < 0) {
+                warn("listen()");
+                return ERROR(-errno);
+        }
+        printf("Listening on \"%s\"\n", path);
+        d->tags = tags;
+        d->path = path;
+        d->nr_tags = nr_tags;
+        for (int32_t i = 0; i < nr_tags; ++i) {
+                seq_init(&d->tags[i].seq);
+        }
+        *out = d;
+        return 0;
+}
+
+void escrowd_fini(struct escrowd *d) {
+        for (int32_t i = 0; i < d->nr_tags; ++i) {
+                struct seq *s   = &d->tags[i].seq;
+                int32_t     max = seq_nr(s);
+                for (int32_t j = 0; j < max; ++j) {
+                        mem_free(seq_get(s, i));
+                }
+                seq_fini(&d->tags[i].seq);
+        }
+        mem_free(d->tags);
+        close(d->stream);
+        close(d->fd);
+        unlink(d->path);
 }
 
 int escrowd_loop(struct escrowd *d) {

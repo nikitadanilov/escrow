@@ -13,9 +13,9 @@
 enum { PORT = 8087 };
 
 int main(int argc, char **argv) {
-        int sock;
+        int                sock;
         struct sockaddr_in serv_addr;
-        const char cycle[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+        const char         cycle[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
         if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
                 err(EXIT_FAILURE, "socket()");

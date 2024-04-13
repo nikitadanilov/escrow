@@ -16,8 +16,8 @@ enum { PORT = 8087 };
 int main(int argc, char **argv) {
         int            sock;
         struct escrow *escrow;
-        int            opt = 1;
         char           ch;
+        int            opt    = 1;
         int32_t        nob    = 0;
         int            result = escrow_init(argv[1], ESCROW_VERBOSE | ESCROW_FORCE, 1, &escrow);
         if (result != 0) {
@@ -27,7 +27,6 @@ int main(int argc, char **argv) {
         if (result != 0 && result != -ENOENT) {
                 errx(EXIT_FAILURE, "escrow_init(): %i", result);
         }
-        printf("got %i from escrow.\n", sock);
         if (sock == -1) {
                 int                server_fd;
                 struct sockaddr_in address;
@@ -50,15 +49,18 @@ int main(int argc, char **argv) {
                 if ((sock = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) == -1) {
                         err(EXIT_FAILURE, "accept()");
                 }
-                printf("connected: %i.\n", sock);
                 close(server_fd);
                 escrow_add(escrow, 0, 0, sock, nob, &ch);
         }
         while ((result = read(sock, &ch, sizeof ch)) > 0) {
                 write(sock, &ch, result);
         }
-        err(EXIT_FAILURE, "write()");
+        result = escrow_del(escrow, 0, 0);
+        if (result < 0) {
+                errx(EXIT_FAILURE, "escrow_del(): %i", result);
+        }
         close(sock);
+        escrow_fini(escrow);
         return 0;
 }
 

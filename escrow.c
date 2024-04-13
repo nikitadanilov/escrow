@@ -387,18 +387,18 @@ int escrowd_init(struct escrowd **out, const char *path, uint32_t flags, int32_t
         if (d == NULL || tags == NULL) {
                 mem_free(d);
                 mem_free(tags);
-                warn("Cannot allocate escrowd.");
+                EV(flags, warn("Cannot allocate escrowd."));
                 return ERROR(-ENOMEM);
         }
         if (flags & ESCROW_FORCE) {
                 unlink(path);
         }
         if (strlen(path) >= sizeof(address.sun_path) - 1) {
-                warn("path is too long: \"%s\"", path);
+                EV(flags, warn("Path is too long: \"%s\"", path));
                 return ERROR(-EINVAL);
         }
         if ((d->fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-                warn("socket()");
+                EV(flags, warn("socket()"));
                 return ERROR(-errno);
         }
         address.sun_family = AF_UNIX;
@@ -407,14 +407,14 @@ int escrowd_init(struct escrowd **out, const char *path, uint32_t flags, int32_t
         result = bind(d->fd, (struct sockaddr *)&address, sizeof(address));
         umask(mask);
         if (result < 0) {
-                warn("bind()");
+                EV(flags, warn("bind()"));
                 return ERROR(-errno);
         }
         if (listen(d->fd, QUEUE) < 0) {
-                warn("listen()");
+                EV(flags, warn("listen()"));
                 return ERROR(-errno);
         }
-        printf("Listening on \"%s\"\n", path);
+        EV(flags, printf("Listening on \"%s\"\n", path));
         d->tags = tags;
         d->path = path;
         d->nr_tags = nr_tags;

@@ -25,6 +25,15 @@ int main(int argc, char **argv) {
         if (result != 0) {
                 errx(EXIT_FAILURE, "escrow_init(): %i", result);
         }
+        /*
+         * Retrive the socket from the escrow.
+         *
+         * If this is the first time the server connects to the escrow, this
+         * returns -ENOENT and places -1 into sock.
+         *
+         * If the echo-server is restarted, the escrow returns the socket that
+         * the previous instance of the echo-server placed there.
+         */
         result = escrow_get(escrow, 0, 0, &sock, &nob, &ch);
         if (result != 0 && result != -ENOENT) {
                 errx(EXIT_FAILURE, "escrow_init(): %i", result);

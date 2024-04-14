@@ -112,7 +112,7 @@ enum {
 };
 
 /*
- * Establishes the connection to escrowd, starting it if necessary.
+ * Establishes a connection to escrowd, starting it if necessary.
  *
  * NR_TAGS is the number of tags that a newly started escrowd will have.
  */
@@ -142,7 +142,7 @@ int escrow_tag(struct escrow *escrow, int16_t tag, int32_t *nr, int32_t *nob);
  * It is up to the user to close the returned file descriptor.
  */
 int escrow_get(struct escrow *escrow, int16_t tag, int32_t idx, int *fd, int32_t *nob, void *data);
-/* Places the descriptor in the escrow. */
+/* Places the descriptor and its payload in the escrow. */
 int escrow_add(struct escrow *escrow, int16_t tag, int32_t idx, int  fd, int32_t  nob, void *data);
 /* Deletes the descriptor and its payload from the escrow. */
 int escrow_del(struct escrow *escrow, int16_t tag, int32_t idx);

@@ -81,6 +81,35 @@ payload only without a file descriptor, by providing (-1) as `fd` argument to
 of payload is to store auxiliary information about the file descriptor that
 recovery uses to restore application-specific per-descriptor state.
 
+See [escrow.h](escrow.h) for details.
+
+ - `int escrow_init(const char *path, uint32_t flags, int32_t nr_tags, struct escrow **escrow)`:
+    Establishes a connection to escrowd, starting it if necessary. `nr_tags` is the 
+    number of tags that a newly started escrowd will have.
+
+ - `void escrow_fini(struct escrow *escrow)`:
+   Finalises the escrow connection.
+
+ - `int escrow_tag(struct escrow *escrow, int16_t tag, int32_t *nr, int32_t *nob)`:
+   Returns information about a tag.
+   In `nr` the maximal used index in this tag plus one is placed. Note, that some
+   indices less than the maximal one can be absent.
+   In `nob` the sum of payload sizes of all descriptors in the tag is placed. This
+   can be used to pre-allocate memory for payloads before the recovery.
+
+ - `int escrow_get(struct escrow *escrow, int16_t tag, int32_t idx, int *fd, int32_t *nob, void *data)`:
+   Retrieves the descriptor with the given index in the given tag.
+   `*nob` contains the size of the payload buffer `data`.
+   The retrieved descriptor is placed in `*fd`, the actual size of the payload is
+   returned in `*nob`. The payload is copied into `data`, truncated at the original
+   size in `*nob` if necessary. It is up to the user to close the returned file descriptor.
+
+ - `int escrow_add(struct escrow *escrow, int16_t tag, int32_t idx, int  fd, int32_t  nob, void *data)`:
+   Places the descriptor and its payload in the escrow.
+   
+ - `int escrow_del(struct escrow *escrow, int16_t tag, int32_t idx)`:
+   Deletes the descriptor and its payload from the escrow.
+
 RETURN VALUES
 -------------
 

@@ -82,6 +82,12 @@
  * The interface is neither MT nor ASYNC safe. In case of a multi-threaded user,
  * explicit serialisation is needed.
  *
+ * TRANSPORTABILITY
+ *
+ * The code should compile on any reasonable UNIX. Linux-specific and
+ * Darwin-specific bits (mostly setting the process name for escrowd) are
+ * compiled conditionally.
+ *
  */
 
 #include <stdint.h>

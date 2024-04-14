@@ -223,3 +223,5 @@ TODO
 ----
 
   - Add an interface to plug escrow client to `select`/`poll`/`epoll`
+
+  - Add tests

@@ -186,3 +186,8 @@ recv: {GET   0   0} (-1)   0         # escrowd receives the request.
 send: {ADD   0   0   5    0} (6)   0 # escrowd replies with the socket descriptor that ... 
 recv: {ADD   0   0   5    0} (4)   0 # ... the previous instance of echo-server placed.
 ```
+
+TODO
+----
+
+  - Add an interface to plug escrow client to `select`/`poll`/`epoll`

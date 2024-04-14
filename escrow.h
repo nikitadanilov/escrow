@@ -31,7 +31,11 @@
  *     - resume request and connection processing.
  *
  * From the client perspective this process is transparent (save for a delay):
- * the connection to the server is not broken.
+ * the connection to the server is not broken. Note that escrowd is
+ * single-threaded and can have at most a single client at a time. Hence, the
+ * new service version binary can start before the previous instance terminated:
+ * it will be safely blocked in an attempt to connect to escrowd until the
+ * previous instance disconnects.
  *
  * The same mechanism can be used for recovery after a process crash, except in
  * this case there is no guarantee that the connections were left in some known

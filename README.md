@@ -50,6 +50,9 @@ descriptors: a priviledged process can open a device or establish and
 authenticate a connection and then place the resulting file descriptor in an
 escrow, from which it can be retrieved by any properly authorised process.
 
+One can imagine load-balancing by passing live client connections between
+multiple instances of a service perhaps across container boundaries.
+
 INTERFACE OVERVIEW
 ------------------
 

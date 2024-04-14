@@ -1,6 +1,8 @@
 #!/usr/bin/bash
 
-CFLAGS="-fno-omit-frame-pointer -O0 -g -Wall"
-cc $CFLAGS echo-server.c escrow.c -o echo-server
-cc $CFLAGS echo-client.c -o echo-client
-cc $CFLAGS escrow.c main.c -o escrowd
+CFLAGS=${CFLAGS:-""}
+CC=${CC:-cc}
+$CC $CFLAGS escrow.c -c -o escrow.o
+$CC $CFLAGS echo-server.c escrow.o -o echo-server
+$CC $CFLAGS echo-client.c -o echo-client
+$CC $CFLAGS escrow.o main.c -o escrowd 

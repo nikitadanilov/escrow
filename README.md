@@ -69,7 +69,7 @@ exist, it starts the daemon automatically.
 When a file descriptor is placed in an escrow, the user specifies a 16-bit
 tag and a 32-bit index within the tag. Tags can be used to simplify descriptor
 recovery. For example, in the service upgrade scenario described above, the
-service can place all listener sockets in one tag and all accepter stream
+service can place all listener sockets in one tag and all accepted stream
 sockets in another. The recovery can first recover all listeners and then all
 streams. The total number of tags is specified when the escrow is created.
 

@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
                 if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
                         err(EXIT_FAILURE, "socket()");
                 }
-                if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+                if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
                         err(EXIT_FAILURE, "setsockopt()");
                 }
                 address.sin_family = AF_INET;

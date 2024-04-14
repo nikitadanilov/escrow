@@ -13,9 +13,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <assert.h>
-#include <sys/prctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
+#ifdef __APPLE__
+#include <string.h>
+#endif
 
 #include "escrow.h"
 
@@ -499,9 +504,18 @@ int escrowd(const char *path, uint32_t flags, int32_t nr_tags) {
 }
 
 int escrowd_fork(const char *path, uint32_t flags, int32_t nr_tags) {
+        static const char escrowd_name[] = "escrowd";
         int result = fork();
         if (result == 0) {
-                result = daemon(true, true) ?: prctl(PR_SET_NAME, "escrowd", 0, 0, 0);
+                result = daemon(true, true) ?:
+#if defined(__linux__)
+                         prctl(PR_SET_NAME, escrowd_name, 0, 0, 0)
+#elif defined(__APPLE__)
+                         (setprogname(escrowd_name), 0)
+#else
+                         0
+#endif
+                         ;
                 if (result == 0) {
                         result = escrowd(path, flags, nr_tags);
                 } else {

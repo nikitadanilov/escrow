@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-CFLAGS=${CFLAGS:-""}
+CFLAGS=${CFLAGS:-"-Wall"}
 CC=${CC:-cc}
 $CC $CFLAGS escrow.c -c -o escrow.o
 $CC $CFLAGS echo-server.c escrow.o -o echo-server

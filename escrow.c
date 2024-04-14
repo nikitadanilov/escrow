@@ -61,6 +61,7 @@
 #define ERROR(x) (x)
 
 #define EV(flags, ...) ({ if(flags & ESCROW_VERBOSE) { __VA_ARGS__; } })
+#define OUT(...) fprintf(stderr, __VA_ARGS__)
 
 static int32_t min_32(int32_t a, int32_t b) {
         return b + ((a - b) & ((a - b) >> 31));
@@ -235,32 +236,32 @@ static int32_t msize(const struct msg *m) {
 static void mprint(const struct msg *m) {
         switch (m->opcode) {
         case ADD:
-                printf("{ADD %3i %3i %3i %4i}", m->add.tag, m->add.idx, m->add.ufd, m->add.nob);
+                OUT("{ADD %3i %3i %3i %4i}", m->add.tag, m->add.idx, m->add.ufd, m->add.nob);
                 break;
         case DEL:
-                printf("{DEL %3i %3i}", m->del.tag, m->del.idx);
+                OUT("{DEL %3i %3i}", m->del.tag, m->del.idx);
                 break;
         case REP:
-                printf("{REP %3i \"%s\"}", m->rep.rc, m->rep.data);
+                OUT("{REP %3i \"%s\"}", m->rep.rc, m->rep.data);
                 break;
         case TAG:
-                printf("{REP %3i}", m->tag.tag);
+                OUT("{REP %3i}", m->tag.tag);
                 break;
         case INF:
-                printf("{INF %4i %5i}", m->inf.nr, m->inf.total);
+                OUT("{INF %4i %5i}", m->inf.nr, m->inf.total);
                 break;
         case GET:
-                printf("{GET %3i %3i}", m->get.tag, m->get.idx);
+                OUT("{GET %3i %3i}", m->get.tag, m->get.idx);
                 break;
         default:
-                printf("{UNKNOWN %i}", m->opcode);
+                OUT("{UNKNOWN %i}", m->opcode);
         }
 }
 
 static void mshow(const char *label, const struct msg *m, int fd, int rc) {
-        printf("%s: ", label);
+        OUT("%s: ", label);
         mprint(m);
-        printf(" (%i) %3i\n", fd, rc);
+        OUT(" (%i) %3i\n", fd, rc);
 }
 
 static int mrecv(const struct stream *s, struct msg *m, int *out) {
@@ -429,7 +430,7 @@ int escrowd_init(struct escrowd **out, const char *path, uint32_t flags, int32_t
                 EV(flags, warn("listen()"));
                 return ERROR(-errno);
         }
-        EV(flags, printf("Listening on \"%s\"\n", path));
+        EV(flags, OUT("Listening on \"%s\"\n", path));
         d->tags = tags;
         d->path = path;
         d->nr_tags = nr_tags;
@@ -505,7 +506,7 @@ int escrowd(const char *path, uint32_t flags, int32_t nr_tags) {
         }
         while (true) {
                 int result = escrowd_loop(d);
-                EV(flags, fprintf(stderr, "Session completed with %i.\n", result));
+                EV(flags, OUT("Session completed with %i.\n", result));
         }
         escrowd_fini(d);
         return 0;
@@ -677,12 +678,12 @@ struct escrow {
 static int replied(const struct escrow *e, const struct msg *m) {
         if (m->opcode == REP) {
                 if (m->rep.rc != 0) {
-                        EV(e->fd.flags, fprintf(stderr, "Received from the escrowd: %i \"%s\"\n",
-                                                m->rep.rc, m->rep.data));
+                        EV(e->fd.flags, OUT("Received from the escrowd: %i \"%s\"\n",
+                                            m->rep.rc, m->rep.data));
                 }
                 return m->rep.rc;
         } else {
-                EV(e->fd.flags, fprintf(stderr, "Unexpected reply from escrowd: %i\n", m->opcode));
+                EV(e->fd.flags, OUT("Unexpected reply from escrowd: %i\n", m->opcode));
                 return -EPROTO;
         }
 }
@@ -700,11 +701,11 @@ static int escrow_init_try(const char *path, uint32_t flags, int32_t nr_tags, st
                         address.sun_family = AF_UNIX;
                         strncpy(address.sun_path, path, sizeof(address.sun_path) - 1);
                         if (connect(e->fd.fd, (void *)&address, sizeof address) >= 0) {
-                                EV(e->fd.flags, fprintf(stderr, "Connected to \"%s\"\n", path));
+                                EV(e->fd.flags, OUT("Connected to \"%s\"\n", path));
                                 *escrow = e;
                                 return 0;
                         } else if (errno == ENOENT || errno == ECONNREFUSED || errno == ESHUTDOWN) {
-                                EV(e->fd.flags, fprintf(stderr, "Starting escrowd (%i).\n", errno));
+                                EV(e->fd.flags, OUT("Starting escrowd (%i).\n", errno));
                                 result = escrowd_fork(path, flags, nr_tags);  /* Nobody is there. */
                                 if (result == 0) { /* Re-try. */
                                         result = -EAGAIN;

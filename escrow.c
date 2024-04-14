@@ -111,9 +111,14 @@ struct tag {
 struct msg;
 struct mrep;
 
+struct stream {
+        uint32_t flags;
+        int      fd;
+};
+
 struct escrowd { /* Escrow domain representing one (restartable) client process. */
         int                fd; /* UNIX socket. */
-        int            stream; /* Accepted socket. */
+        struct stream  stream; /* Accepted socket. */
         const char      *path;
         uint64_t          key;
         int32_t       nr_tags;
@@ -252,21 +257,23 @@ static void mprint(const struct msg *m) {
         }
 }
 
-static int mrecv(int fd, struct msg *m, int *out) {
+static void mshow(const char *label, const struct msg *m, int fd, int rc) {
+        printf("%s: ", label);
+        mprint(m);
+        printf(" (%i) %3i\n", fd, rc);
+}
+
+static int mrecv(const struct stream *s, struct msg *m, int *out) {
         int result;
         SET0(m);
-        result = recv_fd(fd, sizeof *m, m, out);
-        printf("recv: ");
-        mprint(m);
-        printf(" (%i) %3i\n", *out, result);
+        result = recv_fd(s->fd, sizeof *m, m, out);
+        EV(s->flags, mshow("recv", m, *out, result));
         return result;
 }
 
-static int msend(int fd, const struct msg *m, int in) {
-        int result = send_fd(fd, msize(m), m, in);
-        printf("send: ");
-        mprint(m);
-        printf(" (%i) %3i\n", in, result);
+static int msend(const struct stream *s, const struct msg *m, int in) {
+        int result = send_fd(s->fd, msize(m), m, in);
+        EV(s->flags, mshow("send", m, in, result));
         return result;
 }
 
@@ -280,7 +287,7 @@ static int reply(struct escrowd *d, int16_t rc, const char *descr) {
         d->rep->rc     = rc;
         d->rep->nob    = strlen(descr) + 1;
         strcpy((void *)d->rep->data, descr);
-        return msend(d->stream, (void *)d->rep, -1);
+        return msend(&d->stream, (void *)d->rep, -1);
 }
 
 static int ok(struct escrowd *d) {
@@ -357,7 +364,7 @@ static int tag(struct escrowd *d, const struct mtag *m, int fd) {
                         info.total += s->nob;
                 }
         }
-        return msend(d->stream, (void *)&info, -1);
+        return msend(&d->stream, (void *)&info, -1);
 }
 
 static int get(struct escrowd *d, const struct mget *m, int fd) {
@@ -380,7 +387,7 @@ static int get(struct escrowd *d, const struct mget *m, int fd) {
         add.ufd    = s->ufd;
         add.nob    = s->nob;
         memcpy(add.data, s->data, s->nob);
-        return msend(d->stream, (void *)&add, s->fd);
+        return msend(&d->stream, (void *)&add, s->fd);
 }
 
 /* @daemon */
@@ -397,6 +404,7 @@ int escrowd_init(struct escrowd **out, const char *path, uint32_t flags, int32_t
                 EV(flags, warn("Cannot allocate escrowd."));
                 return ERROR(-ENOMEM);
         }
+        d->stream.flags = flags;
         if (flags & ESCROW_FORCE) {
                 unlink(path);
         }
@@ -442,7 +450,7 @@ void escrowd_fini(struct escrowd *d) {
                 seq_fini(&d->tags[i].seq);
         }
         mem_free(d->tags);
-        close(d->stream);
+        close(d->stream.fd);
         close(d->fd);
         unlink(d->path);
 }
@@ -454,13 +462,13 @@ int escrowd_loop(struct escrowd *d) {
         int         result;
         d->req = &m;
         d->rep = &rep;
-        d->stream = accept(d->fd, NULL, NULL);
-        if (d->stream < 0) {
+        d->stream.fd = accept(d->fd, NULL, NULL);
+        if (d->stream.fd < 0) {
                 return -errno;
         }
         while (true) {
                 fd = -1;
-                result = mrecv(d->stream, &m, &fd);
+                result = mrecv(&d->stream, &m, &fd);
                 if (result != 0) {
                         break;
                 }
@@ -485,7 +493,7 @@ int escrowd_loop(struct escrowd *d) {
                 }
         }
         close(fd);
-        close(d->stream);
+        close(d->stream.fd);
         return result;
 }
 
@@ -663,19 +671,18 @@ static void mem_free(void *mem) {
 /* @client */
 
 struct escrow {
-        int      fd;
-        uint32_t flags;
+        struct stream fd;
 };
 
 static int replied(const struct escrow *e, const struct msg *m) {
         if (m->opcode == REP) {
                 if (m->rep.rc != 0) {
-                        EV(e->flags, fprintf(stderr, "Received from the escrowd: %i \"%s\"\n",
-                                             m->rep.rc, m->rep.data));
+                        EV(e->fd.flags, fprintf(stderr, "Received from the escrowd: %i \"%s\"\n",
+                                                m->rep.rc, m->rep.data));
                 }
                 return m->rep.rc;
         } else {
-                EV(e->flags, fprintf(stderr, "Unexpected reply from escrowd: %i\n", m->opcode));
+                EV(e->fd.flags, fprintf(stderr, "Unexpected reply from escrowd: %i\n", m->opcode));
                 return -EPROTO;
         }
 }
@@ -687,30 +694,30 @@ static int escrow_init_try(const char *path, uint32_t flags, int32_t nr_tags, st
                 if (path == NULL) {
                         path = getenv("ESCROW_PATH");
                 }
-                e->flags = flags;
-                if ((e->fd = socket(AF_UNIX, SOCK_STREAM, 0)) >= 0) {
+                e->fd.flags = flags;
+                if ((e->fd.fd = socket(AF_UNIX, SOCK_STREAM, 0)) >= 0) {
                         struct sockaddr_un address;
                         address.sun_family = AF_UNIX;
                         strncpy(address.sun_path, path, sizeof(address.sun_path) - 1);
-                        if (connect(e->fd, (void *)&address, sizeof address) >= 0) {
-                                EV(e->flags, fprintf(stderr, "Connected to \"%s\"\n", path));
+                        if (connect(e->fd.fd, (void *)&address, sizeof address) >= 0) {
+                                EV(e->fd.flags, fprintf(stderr, "Connected to \"%s\"\n", path));
                                 *escrow = e;
                                 return 0;
                         } else if (errno == ENOENT || errno == ECONNREFUSED || errno == ESHUTDOWN) {
-                                EV(e->flags, fprintf(stderr, "Starting escrowd (%i).\n", errno));
+                                EV(e->fd.flags, fprintf(stderr, "Starting escrowd (%i).\n", errno));
                                 result = escrowd_fork(path, flags, nr_tags);  /* Nobody is there. */
                                 if (result == 0) { /* Re-try. */
                                         result = -EAGAIN;
                                 }
                         } else {
-                                EV(e->flags, warn("connect()"));
+                                EV(e->fd.flags, warn("connect()"));
                                 result = -errno;
                         }
                         if (result != 0) {
-                                close(e->fd);
+                                close(e->fd.fd);
                         }
                 } else {
-                        EV(e->flags, warn("socket()"));
+                        EV(e->fd.flags, warn("socket()"));
                         result = -errno;
                 }
                 if (result != 0) {
@@ -731,14 +738,14 @@ int escrow_init(const char *path, uint32_t flags, int32_t nr_tags, struct escrow
 }
 
 void escrow_fini(struct escrow *escrow) {
-        close(escrow->fd);
+        close(escrow->fd.fd);
         mem_free(escrow);
 }
 
 int escrow_tag(struct escrow *escrow, int16_t tag, int32_t *nr, int32_t *nob) {
         struct msg m = { .tag = { .opcode = TAG, .tag = tag } };
         int        dummy;
-        int        result = msend(escrow->fd, &m, -1) ?: mrecv(escrow->fd, &m, &dummy);
+        int        result = msend(&escrow->fd, &m, -1) ?: mrecv(&escrow->fd, &m, &dummy);
         if (result == 0) {
                 if (m.opcode == INF) {
                         *nr  = m.inf.nr;
@@ -752,7 +759,7 @@ int escrow_tag(struct escrow *escrow, int16_t tag, int32_t *nr, int32_t *nob) {
 
 int escrow_get(struct escrow *escrow, int16_t tag, int32_t idx, int *fd, int32_t *nob, void *data) {
         struct msg m = { .get = { .opcode = GET, .tag = tag, .idx = idx } };
-        int        result = msend(escrow->fd, &m, -1) ?: mrecv(escrow->fd, &m, fd);
+        int        result = msend(&escrow->fd, &m, -1) ?: mrecv(&escrow->fd, &m, fd);
         if (result == 0) {
                 if (m.opcode == ADD) {
                         memcpy(data, m.add.data, min_32(*nob, m.add.nob));
@@ -769,13 +776,13 @@ int escrow_add(struct escrow *escrow, int16_t tag, int32_t idx, int fd, int32_t 
         int        dummy;
         ASSERT(nob <= ARRAY_SIZE(m.add.data));
         memcpy(m.add.data, data, nob);
-        return msend(escrow->fd, &m, fd) ?: mrecv(escrow->fd, &m, &dummy) ?: replied(escrow, &m);
+        return msend(&escrow->fd, &m, fd) ?: mrecv(&escrow->fd, &m, &dummy) ?: replied(escrow, &m);
 }
 
 int escrow_del(struct escrow *escrow, int16_t tag, int32_t idx) {
         struct msg m = { .del = { .opcode = DEL, .tag = tag, .idx = idx } };
         int        dummy;
-        return msend(escrow->fd, &m, -1) ?: mrecv(escrow->fd, &m, &dummy) ?: replied(escrow, &m);
+        return msend(&escrow->fd, &m, -1) ?: mrecv(&escrow->fd, &m, &dummy) ?: replied(escrow, &m);
 }
 
 /*

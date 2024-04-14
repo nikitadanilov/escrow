@@ -120,9 +120,11 @@ int escrow_tag(struct escrow *escrow, int16_t tag, int32_t *nr, int32_t *nob);
 /*
  * Retrieves the descriptor with the given index in the given tag.
  *
- * The retrieved descriptor is placed in *FD, the size of the payload is
- * returned in *NOB. The payload is copied into DATA, which is assumed to have a
- * sufficient size.
+ * *NOB contains the size of the payload buffer DATA.
+ *
+ * The retrieved descriptor is placed in *FD, the actual size of the payload is
+ * returned in *NOB. The payload is copied into DATA, truncated at the original
+ * size in *NOB if necessary.
  *
  * It is up to the user to close the returned file descriptor.
  */
